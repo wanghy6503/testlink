@@ -25,6 +25,7 @@ require_once('doAuthorize.php');
 $templateCfg = templateConfiguration();
 $doRenderLoginScreen = false;
 $doAuthPostProcess = false;
+$authCfg = config_get('authentication');
 
 doDBConnect($db, database::ONERROREXIT);
 $args = init_args();
@@ -52,6 +53,37 @@ switch($args->action)
   break;
   
   case 'loginform':
+    if($authCfg['cas_enable'])
+    {    
+       if($authCfg['cas_debug_enable'])
+       {
+          phpCAS::setDebug($authCfg['cas_debug_file']);
+       }
+       // Initialize phpCAS
+       phpCAS::client(CAS_VERSION_2_0, $authCfg['cas_server_name'], $authCfg['cas_server_port'], $authCfg['cas_server_path']);
+       // For production use set the CA certificate that is the issuer of the cert
+       // on the CAS server and uncomment the line below
+       // phpCAS::setCasServerCACert($cas_server_ca_cert_path);
+       
+       // For quick testing you can disable SSL validation of the CAS server.
+       // THIS SETTING IS NOT RECOMMENDED FOR PRODUCTION.
+       // VALIDATING THE CAS SERVER IS CRUCIAL TO THE SECURITY OF THE CAS PROTOCOL!
+       phpCAS::setNoCasServerValidation();
+               
+       // Override the validation url for any (ST and PT) CAS 2.0 validation
+       //phpCAS::setServerProxyValidateURL('http://192.168.1.40:8080/cas/proxyValidate');
+               
+       // Override the validation url for any CAS 1.0 validation
+       //phpCAS::setServerServiceValidateURL('http://192.168.1.40:8080/cas/serviceValidate');
+              
+       phpCAS::handleLogoutRequests();
+       phpCAS::forceAuthentication();
+       $options = array('doSessionExistsCheck' => ($args->action=='doLogin'));
+       $op = doCASAuthorize($db,$options);
+       $doAuthPostProcess = true;
+    }
+    else
+    {
     $doRenderLoginScreen = true;
     // unfortunatelly we use $args->note in order to do some logic.
     if( (trim($args->note) == "") &&
@@ -60,6 +92,7 @@ switch($args->action)
       doSessionStart(true);
       $op = doSSOClientCertificate($db,$_SERVER,$gui->authCfg);
       $doAuthPostProcess = true;
+    }
     }
   break;
 }
@@ -153,6 +186,7 @@ function init_gui(&$db,$args)
       session_destroy();
       $gui->note = lang_get('session_expired');
       $gui->reqURI = null;
+      redirect(TL_BASE_HREF ."login.php?destination=".$args->destination);
     break;
         
     case 'first':

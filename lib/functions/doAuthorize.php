@@ -20,6 +20,58 @@ require_once("users.inc.php");
 require_once("roles.inc.php");
 require_once("ldap_api.php");
 
+function doCASAuthorize(&$db,$options=null)
+{
+   global $g_tlLogger;
+   $result = array('status' => tl::ERROR, 'msg' => null);
+   $user = new tlUser();
+   $user->login = $_SESSION['phpCAS']['user'];
+   $login_exists = ($user->readFromDB($db,tlUser::USER_O_SEARCH_BYLOGIN) >= tl::OK);
+
+   if(!$login_exists)
+   {
+      $user = new tlUser();
+      $user->login = $_SESSION['phpCAS']['user'];
+      $user->isActive = true;
+      $user->authentication = 'LDAP';  // force for auth_does_password_match
+      $user->setPassword($user->login);  // write password on DB anyway
+   }
+   $user->emailAddress = $_SESSION['phpCAS']['attributes']['mail'];
+   $user->firstName = $_SESSION['phpCAS']['attributes']['sn'];
+   $user->lastName = $_SESSION['phpCAS']['attributes']['givenName'];
+   $doLogin = ($user->writeToDB($db) == tl::OK);
+
+   if( $doLogin )
+   {
+      // Need to do set COOKIE following Mantis model
+      $auth_cookie_name = config_get('auth_cookie');
+      $expireOnBrowserClose=false;
+      setcookie($auth_cookie_name,$user->getSecurityCookie(),$expireOnBrowserClose,'/');
+
+      // Disallow two sessions within one browser
+      if ($my['options']['doSessionExistsCheck'] &&
+         isset($_SESSION['currentUser']) && !is_null($_SESSION['currentUser']))
+      {
+         $result['msg'] = lang_get('login_msg_session_exists1') .
+            ' <a style="color:white;" href="logout.php">' .
+            lang_get('logout_link') . '</a>' . lang_get('login_msg_session_exists2');
+      }
+      else
+      {
+         // Setting user's session information
+         $_SESSION['currentUser'] = $user;
+         $_SESSION['lastActivity'] = time();
+
+         $g_tlLogger->endTransaction();
+         $g_tlLogger->startTransaction();
+         setUserSession($db,$user->login, $user->dbID,$user->globalRoleID,$user->emailAddress,$user->locale,null);
+
+         $result['status'] = tl::OK;
+      }
+   }
+   return $result;
+}
+
 /** 
  * authorization function verifies login & password and set user session data 
  * return map

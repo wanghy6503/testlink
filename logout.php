@@ -20,6 +20,17 @@ if ($args->userID)
 }
 session_unset();
 session_destroy();
+$authCfg = config_get('authentication');
+if($authCfg['cas_enable'])
+{
+   if($authCfg['cas_debug_enable'])
+   {
+      phpCAS::setDebug($authCfg['cas_debug_file']);
+   }
+   // Initialize phpCAS
+   phpCAS::client(CAS_VERSION_2_0, $authCfg['cas_server_name'], $authCfg['cas_server_port'], $authCfg['cas_server_path']);
+   phpCAS::logout();
+}
 redirect("login.php?note=logout");
 exit();
 

@@ -363,7 +363,13 @@ $tlCfg->authentication['ldap_email_field'] = 'mail';
 $tlCfg->authentication['ldap_firstname_field'] = 'givenname';
 $tlCfg->authentication['ldap_surname_field'] = 'sn';
 
-
+/** CAS server parameters */
+$tlCfg->authentication['cas_enable'] = true;
+$tlCfg->authentication['cas_server_name'] = '172.17.24.98';
+$tlCfg->authentication['cas_server_port'] = 8180;
+$tlCfg->authentication['cas_server_path'] = 'cas';
+$tlCfg->authentication['cas_debug_enable'] = false;
+$tlCfg->authentication['cas_debug_file'] = '/var/testlink/logs/phpCAS.log';
 
 
 /** Enable/disable Users to create accounts on login page */
